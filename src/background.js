@@ -99,6 +99,7 @@ chrome.webRequest.onBeforeRequest.addListener(
   function (details) {
     if (tabIdsToIntercept.has(details.tabId) && details.url.includes("chunklist_")) {
       console.log("Computed Computed!");
+      console.log(details.url)
       // WE FINALLY have the .m3u8 file link
       // The ffmpeg call will go here
     }
@@ -117,7 +118,11 @@ chrome.tabs.onUpdated.addListener(function(tabId, changeInfo, tab) {
   if (changeInfo.status == "complete") {
     // Tab has finished loading
     chrome.tabs.get(tabId, function(tab) {
-      if (tab.status === "complete" && tab.status != "loading") {
+     
+      //We set a timer to ensure the tab is fully done loading
+      // and updating because sometimes it wasnt even if we checked status as being complete
+      setTimeout(function() {
+        if (tab.status === "complete" && tab.status != "loading") {
         if (tabIdsToIntercept.has(tabId)) {
           console.log("Tab " + tabId + " has finished loading");
           index = index + 1;
@@ -127,6 +132,8 @@ chrome.tabs.onUpdated.addListener(function(tabId, changeInfo, tab) {
           tabIdsToIntercept.delete(tabId);
         }      
       }
+      }, 2000); // Wait 1 second to check if tab is still making requests
+     
     });
   }
 });
