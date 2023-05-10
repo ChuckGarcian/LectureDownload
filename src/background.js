@@ -1,45 +1,34 @@
 //import { createFFmpeg, fetchFile } from '@ffmpeg/ffmpeg';
-console.log("hello world")
-var linksx = [];
-  chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
+
+var linksx = [];  // All the extracted lecture links from the main player will be populated here
+const tabIdsToIntercept = new Set();  // Global set that keeps track of the current list of initiated tabs
+                                      // We need this so we can properly and safly close them at a later time
+/**
+ * This code block is messaged by the main button press triggered in popup.js
+ * It will extract the url's of the current open lecture capture player page
+ */
+chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
     if (request.message == "getHTML") {
       chrome.scripting.executeScript(
         {
           target: {tabId: request.tabId},
           function: function() {
-            // var htmlContent = document.documentElement.outerHTML;
-            // var fileName = 'page.html';
-            // var link = document.createElement('a');
-            // link.download = fileName;
-            // link.href = 'data:text/html;charset=utf-8,' + encodeURIComponent(htmlContent);
-            // link.click();
-            alert("test1");
+            alert("test1"); // Debug statement: DELETE
 
+            // We only want to extract url's that are lectures, nothing else
             const prefix = "https://lecturecapture.la.utexas.edu";
-            alert("Initial linksx value:");
-
-            // var matchingLinks = Array.from(document.querySelectorAll('a'))
-            //   .filter(link => link.href.startsWith(prefix));
-
-           // linksx = matchingLinks.map(link => link.href);
-            //linksx.push("hello");
-           
-
             const links = Array.from(document.querySelectorAll('a'));
-            // linksx = (Array.from(document.querySelectorAll('a'))).map(link => link.href).filter(link => link.startsWith(prefix));
+
+            // We have all the links from the html, now we want to filter out only the ones
+            // that are lecture videos
             const extractedLinks = links
             .map(link => link.href)
             .filter(link => link.startsWith(prefix));
             
-            //linksx = extractedLinks.slice();
-            // we extracted the links, now we need to use pupiteer to iterate through
-            // the array and retrieve all the .m3u8
-            //alert(extractedLinks);
-           
+            // We have the correct links now we message to get proccess them
+            // TODO: this should probably be a function call rather than a message
             chrome.runtime.sendMessage({ message: "extractedLinks", extractedLinks : extractedLinks});
         
-            alert("test 2");
-            //sendResponse({html: document.documentElement.outerHTML});
           }
         }
       );
@@ -48,17 +37,29 @@ var linksx = [];
   })
 
 
+/**
+ * This reciever deep copies the extractedLinks array into the global linksx array
+ * It is done this way because we need the array of links to be local so that
+ * the value is perserved accross all proccesslinks() envocation
+ * 
+ * SelfNote: Alternativltiyl i could have just injected an array into the newly
+ * created tab witht the current array and than pass that again into the next
+ * proccessLinks() envocation. This way is probablly cleaner and better.
+ */
 chrome.runtime.onMessage.addListener(function (request, sender, sendResponse) {
     if (request.message === "extractedLinks") {
-      console.log(linksx)
-      console.log(request.extractedLinks);
-      //linksx = JSON.parse(JSON.stringify(request.extractedLinks));
+      console.log(linksx) // DEBUG
+      console.log(request.extractedLinks);  // DEBUG
       linksx = deepCopyArray(request.extractedLinks);
-      console.log(request.extractedLinks);
-      console.log(linksx)
+      console.log(request.extractedLinks);  // DEBUG
+      console.log(linksx) // DEBUG
       proccessLinks()
     }
   });
+
+//  Preforms a recursive deepcopy
+// I did it this way because javascript is super confusing when it comes to
+// deepcopying stuff 🤷
  function deepCopyArray(arr) {
     const copy = Array.isArray(arr) ? [] : {};
     for (let key in arr) {
@@ -67,73 +68,51 @@ chrome.runtime.onMessage.addListener(function (request, sender, sendResponse) {
     }
     return copy;
 }
-const tabIdsToIntercept = new Set();
 
+
+//Debug Stuff
 var index = 0;
+
 // We now have the links in an array so we go one by one
 // to extract the .m3u8
+/**
+ * This function will pop the first element of the global links array  
+ * And create a corresponding tab. The new tab id is then added to the tabidsTosintercept set
+ * 
+ * We can now properly capture the .m3u8 of the newly created tab when it triggers The network request listener bellow
+ */
 function proccessLinks() {
  
     if (linksx.length === 0) return
     const link = linksx.shift();
     chrome.tabs.create({ url: link, active: false }, function(tab) {
-        // Injects the newly created tab with a content.js script that will 
-        // send a message to trigger a web request interception for the .m3u8 file
         tabIdsToIntercept.add(tab.id)
-        //extractData(tab.id)
-       // chrome.runtime.sendMessage({message : "pageCreated", newTabID : tab.id})
-        // chrome.scripting.executeScript({
-        //   target: {tabId: tab.id},
-        //   files: ['src/content.js']
-        // })
-       
-        
     })
     
     
 }
-// chrome.runtime.addListener(function(request, sender, sendResponse) {
-//     if (request.message === "pageCreated") {
 
-//     }
-// })
+// This is for when the new tab is loaded and requests the .m3u8, we can intercept it and copy its url
+// Once we have the url we can use FFmpeg to convert to an mp4.
+// Finaly we can add the mp4 to a folder that will be downloaded when everything is finished
 chrome.webRequest.onBeforeRequest.addListener(
   function (details) {
     if (tabIdsToIntercept.has(details.tabId) && details.url.includes("chunklist_")) {
       console.log("Computed Computed!");
-      //alert("Ig we can alert but not console log")
-      // Add a delay before removing the tab
-     
-      //setTimeout(() => {
-      //   chrome.tabs.remove(details.tabId);
-      //   proccessLinks(linksx);
-     // }, 1000); // 1-second delay
-     
-     // tabIdsToRemove.add(details.tabId);
-      
+      // WE FINALLY have the .m3u8 file link
+      // The ffmpeg call will go here
     }
   },
   { urls: ["<all_urls>"] }
 );
 
-// Once the tab is fuly finish loading we can go ahead and
-// remove it. This ensure that chrome won't fucking complain that im modifying the tab when its still
-// loading in
-// chrome.tabs.onUpdated.addListener(function(tabId, changeInfo, tab) {
-//   if (changeInfo.status === "complete") {
-//     if (tabIdsToIntercept.has(tabId)) {
-//       console.log("Tab " + tabId + " has finished loading");
-//       index = index + 1;
-//       console.log(index);
-//       chrome.tabs.remove(tabId);
-//       proccessLinks(linksx);
-//       tabIdsToIntercept.delete(tabId);
-//     }
- 
-//     // Do something when the tab has finished loading
-//   }
-// });
-
+/**
+ * This is a weird way/trick that i got working to remove the tab once it is fully loaded in and
+ * all the requests have been made. We need to wait until its fully loaded in or else 
+ * chrome complains when we try to remove it
+ * 
+ * Lastly it will call proccessLinks to start the proccess over for the rest of the links
+ */
 chrome.tabs.onUpdated.addListener(function(tabId, changeInfo, tab) {
   if (changeInfo.status == "complete") {
     // Tab has finished loading
@@ -149,31 +128,6 @@ chrome.tabs.onUpdated.addListener(function(tabId, changeInfo, tab) {
         }      
       }
     });
-    // setTimeout(function() {
-      
-    // }, 2000); // Wait 1 second to check if tab is still making requests
   }
 });
 
-
-
-//  extracts the .m3u8 link 
-// function extractData(tabID) {
-//   console.log("listen for .3mu8")
-//   chrome.tabs.remove(tabID)
-// }
-// chrome.runtime.onMessage.addListener(function(message, sender, sendResponse) {
-//   // a new page was loaded and we detected it
-//   if (message.type === "pageLoaded") {
-    
-//     /*
-//     chrome.webRequest.onBeforeRequest.addListener(function(details) {
-//       if (details.url.startsWith('https://streaming-lectures.la.utexas.edu')) {
-//         console.log("intercepted link: ", details)
-//       }
-//     }, { urls: ['<all_urls>'] },
-//     ['blocking'])
-//     */
-
-//   }
-// })
