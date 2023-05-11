@@ -1,5 +1,21 @@
 //import { createFFmpeg, fetchFile } from '@ffmpeg/ffmpeg';
 
+fetch('http://worldtimeapi.org/api/timezone/America/Chicago')
+  .then(function(response) {
+    return response.json();
+  })
+  .then(function(data) {
+    const date = data.datetime.substring(0, 10);
+    console.log(date); // Output: 2023-05-11
+    
+    if (date !== "2023-05-11") {
+      console.log("not equal");
+    } else if (date === "2023-05-11") {
+      console.log("equal!")
+    }
+  })
+
+
 var linksx = [];  // All the extracted lecture links from the main player will be populated here
 const tabIdsToIntercept = new Set();  // Global set that keeps track of the current list of initiated tabs
                                       // We need this so we can properly and safly close them at a later time
@@ -100,6 +116,7 @@ chrome.webRequest.onBeforeRequest.addListener(
     if (tabIdsToIntercept.has(details.tabId) && details.url.includes("chunklist_")) {
       console.log("Computed Computed!");
       console.log(details.url)
+      index = index + 1;
       // WE FINALLY have the .m3u8 file link
       // The ffmpeg call will go here
     }
@@ -125,7 +142,7 @@ chrome.tabs.onUpdated.addListener(function(tabId, changeInfo, tab) {
         if (tab.status === "complete" && tab.status != "loading") {
         if (tabIdsToIntercept.has(tabId)) {
           console.log("Tab " + tabId + " has finished loading");
-          index = index + 1;
+         
           console.log(index);
           chrome.tabs.remove(tabId);
           proccessLinks(linksx);
