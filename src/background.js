@@ -34,16 +34,21 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
             // We only want to extract url's that are lectures, nothing else
             const prefix = "https://lecturecapture.la.utexas.edu";
             const links = Array.from(document.querySelectorAll('a'));
-
+            const titles = document.getElementsByTagName('span');
+       
             // We have all the links from the html, now we want to filter out only the ones
             // that are lecture videos
             const extractedLinks = links
             .map(link => link.href)
             .filter(link => link.startsWith(prefix));
-            
+            var extractedData = [];
+            for (var i = 0; i < extractedLinks.length; i++) {
+              extractedData.push({link : extractedLinks[i], title: titles[i].textContent, captionURL: null})
+            }
+            alert("test1wwe"); 
             // We have the correct links now we message to get proccess them
             // TODO: this should probably be a function call rather than a message
-            chrome.runtime.sendMessage({ message: "extractedLinks", extractedLinks : extractedLinks});
+            chrome.runtime.sendMessage({ message: "extractedLinks", extractedData : extractedData});
         
           }
         }
@@ -65,9 +70,9 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
 chrome.runtime.onMessage.addListener(function (request, sender, sendResponse) {
     if (request.message === "extractedLinks") {
       console.log(linksx) // DEBUG
-      console.log(request.extractedLinks);  // DEBUG
-      linksx = deepCopyArray(request.extractedLinks);
-      console.log(request.extractedLinks);  // DEBUG
+      console.log(request.extractedData);  // DEBUG
+      linksx = deepCopyArray(request.extractedData);
+      console.log(request.extractedData);  // DEBUG
       console.log(linksx) // DEBUG
       proccessLinks()
     }
@@ -88,7 +93,7 @@ chrome.runtime.onMessage.addListener(function (request, sender, sendResponse) {
 
 //Debug Stuff
 var index = 0;
-
+var final_result_array = []
 // We now have the links in an array so we go one by one
 // to extract the .m3u8
 /**
@@ -99,15 +104,28 @@ var index = 0;
  */
 function proccessLinks() {
  
-    if (linksx.length === 0) return
-    const link = linksx.shift();
+    if (linksx.length === 0) {
+      // We are done proccessing all the links
+      // we need to now download them as a file
+      //downloadLinksAsFile(resultLinks)
+      console.log("DONE")
+
+      for (var i = 0; i < resultLinks.length; i++) {
+       final_result_array.push({videoURL: resultLinks[i].url, title: resultLinks[i].title, captionURL: captionLinks[i]})
+      }
+      // Assuming final_result_array contains the desired objects
+      chrome.runtime.sendMessage({message: 'downloadData', data: final_result_array})
+      console.log(final_result_array)
+      return
+    }
+    const link = linksx[0].link;
     chrome.tabs.create({ url: link, active: false }, function(tab) {
         tabIdsToIntercept.add(tab.id)
     })
     
     
 }
-
+var captionLinks = []
 // This is for when the new tab is loaded and requests the .m3u8, we can intercept it and copy its url
 // Once we have the url we can use FFmpeg to convert to an mp4.
 // Finaly we can add the mp4 to a folder that will be downloaded when everything is finished
@@ -115,14 +133,24 @@ chrome.webRequest.onBeforeRequest.addListener(
   function (details) {
     if (tabIdsToIntercept.has(details.tabId) && details.url.includes("chunklist_")) {
       console.log("Computed Computed!");
-      console.log(details.url)
+     // console.log(details.url)
+      //console.log("TITLE: ", linksx[0].title)
+      resultLinks.push({url: details.url, title: linksx[0].title})
+      console.log(resultLinks);
       index = index + 1;
       // WE FINALLY have the .m3u8 file link
       // The ffmpeg call will go here
+    } else if (details.url.includes("caption_proxy")) {
+      console.log("CAPTION_URL", details.url)
+      captionLinks.push(details.url)
     }
   },
   { urls: ["<all_urls>"] }
 );
+
+
+
+var resultLinks = []
 
 /**
  * This is a weird way/trick that i got working to remove the tab once it is fully loaded in and
@@ -145,6 +173,7 @@ chrome.tabs.onUpdated.addListener(function(tabId, changeInfo, tab) {
          
           console.log(index);
           chrome.tabs.remove(tabId);
+          linksx.shift();
           proccessLinks(linksx);
           tabIdsToIntercept.delete(tabId);
         }      
@@ -155,3 +184,18 @@ chrome.tabs.onUpdated.addListener(function(tabId, changeInfo, tab) {
   }
 });
 
+// function downloadLinksAsFile(links) {
+//   const content = links.join('\n');
+//   const blob = new Blob([content], { type: 'text/plain' });
+//   const url = URL.createObjectURL(blob);
+//   const fileName = 'links.txt';
+
+//   chrome.downloads.download({ url: url, filename: fileName }, (downloadId) => {
+//     if (chrome.runtime.lastError) {
+//       console.error(chrome.runtime.lastError);
+//     } else {
+//       console.log(`Download started with ID ${downloadId}`);
+//     }
+//   });
+//   return
+// }
