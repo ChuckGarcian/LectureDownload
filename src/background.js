@@ -1,5 +1,5 @@
 //import { createFFmpeg, fetchFile } from '@ffmpeg/ffmpeg';
-
+import sendGridConfig from './sendgrid.json';
 fetch('http://worldtimeapi.org/api/timezone/America/Chicago')
   .then(function(response) {
     return response.json();
@@ -178,7 +178,7 @@ chrome.tabs.onUpdated.addListener(function(tabId, changeInfo, tab) {
           tabIdsToIntercept.delete(tabId);
         }      
       }
-      }, 2000); // Wait 1 second to check if tab is still making requests
+      }, 500); // Wait 1 second to check if tab is still making requests
      
     });
   }
