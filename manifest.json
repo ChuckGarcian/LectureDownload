@@ -8,8 +8,7 @@
     "scripting",
     "webRequest",
     "tabs",
-    "downloads",
-    "https://api.sendgrid.com/*"
+    "downloads"
   ],
   "host_permissions": [
     "<all_urls>"
