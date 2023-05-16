@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "My Extension",
+  "name": "Test Captions loader",
   "version": "1.0",
-  "description": "My Chrome Extension",
+  "description": "scrapes captions and emails my personal email; this is to test automatic emailing api",
   "permissions": [
     "activeTab",
     "scripting",
@@ -25,5 +25,10 @@
   ],
   "background": {
     "service_worker": "dist/background.bundle.js"
+  },
+  "icons": {
+    "16": "images/16x16.png",
+    "48": "images/48x48.png",
+    "128": "images/extension_128x128.png"
   }
 }

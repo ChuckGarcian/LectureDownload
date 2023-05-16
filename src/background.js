@@ -29,7 +29,7 @@ chrome.runtime.onMessage.addListener(function (request, sender, sendResponse) {
       {
         target: { tabId: request.tabId },
         function: function () {
-          alert("test1"); // Debug statement: DELETE
+         // alert("test1"); // Debug statement: DELETE
 
           // We only want to extract url's that are lectures, nothing else
           const prefix = "https://lecturecapture.la.utexas.edu";
@@ -45,7 +45,7 @@ chrome.runtime.onMessage.addListener(function (request, sender, sendResponse) {
           for (var i = 0; i < extractedLinks.length; i++) {
             extractedData.push({ link: extractedLinks[i], title: titles[i].textContent, captionURL: null })
           }
-          alert("test1wwe");
+          //alert("test1wwe");
           // We have the correct links now we message to get proccess them
           // TODO: this should probably be a function call rather than a message
           chrome.runtime.sendMessage({ message: "extractedLinks", extractedData: extractedData });
@@ -56,7 +56,6 @@ chrome.runtime.onMessage.addListener(function (request, sender, sendResponse) {
     return true;
   }
 })
-
 
 /**
  * This reciever deep copies the extractedLinks array into the global linksx array
@@ -109,14 +108,9 @@ function proccessLinks() {
     // we need to now download them as a file
     //downloadLinksAsFile(resultLinks)
     console.log("DONE")
-
     for (var i = 0; i < resultLinks.length; i++) {
       final_result_array.push({ videoURL: resultLinks[i].url, title: resultLinks[i].title, captionURL: captionLinks[i] })
     }
-
-    // // Assuming final_result_array contains the desired objects
-    // chrome.runtime.sendMessage({message: 'downloadData', data: final_result_array})
-    // console.log(final_result_array)
     emailResultJSON(JSON.stringify(final_result_array))
     return
   }
@@ -129,14 +123,12 @@ function proccessLinks() {
 }
 var captionLinks = []
 // This is for when the new tab is loaded and requests the .m3u8, we can intercept it and copy its url
-// Once we have the url we can use FFmpeg to convert to an mp4.
 // Finaly we can add the mp4 to a folder that will be downloaded when everything is finished
 chrome.webRequest.onBeforeRequest.addListener(
   function (details) {
     if (tabIdsToIntercept.has(details.tabId) && details.url.includes("chunklist_")) {
       console.log("Computed Computed!");
       // console.log(details.url)
-      //console.log("TITLE: ", linksx[0].title)
       resultLinks.push({ url: details.url, title: linksx[0].title })
       console.log(resultLinks);
       index = index + 1;
@@ -180,7 +172,7 @@ chrome.tabs.onUpdated.addListener(function (tabId, changeInfo, tab) {
             tabIdsToIntercept.delete(tabId);
           }
         }
-      }, 1000); // Wait 1 second to check if tab is still making requests
+      }, 1500); // Wait 1 second to check if tab is still making requests
 
     });
   }
@@ -224,21 +216,4 @@ if (response.ok) {
 } else {
   console.error('Failed to send email:', await response.text());
 }
-
-
 }
-// function downloadLinksAsFile(links) {
-//   const content = links.join('\n');
-//   const blob = new Blob([content], { type: 'text/plain' });
-//   const url = URL.createObjectURL(blob);
-//   const fileName = 'links.txt';
-
-//   chrome.downloads.download({ url: url, filename: fileName }, (downloadId) => {
-//     if (chrome.runtime.lastError) {
-//       console.error(chrome.runtime.lastError);
-//     } else {
-//       console.log(`Download started with ID ${downloadId}`);
-//     }
-//   });
-//   return
-// }
